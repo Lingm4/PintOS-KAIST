@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -27,6 +28,9 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+/* List of sleeping threads */
+struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +112,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -541,6 +546,17 @@ do_schedule(int status) {
 static void
 schedule (void) {
 	struct thread *curr = running_thread ();
+	
+	/* awake sleeping threads */
+	for (struct list_elem *e = list_begin(&sleep_list); e != list_end(&sleep_list);){
+		struct thread *t = list_entry(e, struct thread, elem);
+		e = list_next(e);
+		if(timer_elapsed(t->sleep_start) >= t->sleep_ticks){
+			list_remove(&t->elem);
+			thread_unblock(t);
+		}
+	}
+
 	struct thread *next = next_thread_to_run ();
 
 	ASSERT (intr_get_level () == INTR_OFF);

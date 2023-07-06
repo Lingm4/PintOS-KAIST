@@ -101,7 +101,7 @@ timer_sleep (int64_t ticks) {
 	list_push_back(&sleep_list, &t->elem);
 	
 	intr_disable();
-	thread_block(t);
+	thread_block();
 	intr_enable();
 }
 

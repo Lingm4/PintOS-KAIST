@@ -425,8 +425,18 @@ static struct thread *
 next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
-	else
-		return list_entry (list_pop_front (&ready_list), struct thread, elem);
+	else{
+		
+		struct thread *highest_prio_thread = list_entry (list_begin(&ready_list), struct thread, elem); 
+		for(struct list_elem *e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)){
+			struct thread *t = list_entry(e, struct thread, elem);
+			if(t->priority > highest_prio_thread->priority)
+				highest_prio_thread = t;
+		}
+		list_remove(&highest_prio_thread->elem);	
+		return highest_prio_thread;
+		//return list_entry (list_pop_front (&ready_list), struct thread, elem); 
+	}
 }
 
 /* Use iretq to launch the thread */

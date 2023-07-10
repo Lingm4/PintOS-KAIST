@@ -100,9 +100,9 @@ timer_sleep (int64_t ticks) {
 	t->sleep_ticks = ticks;
 	list_push_back(&sleep_list, &t->elem);
 	
-	intr_disable();
+	enum intr_level old_level = intr_disable();
 	thread_block();
-	intr_enable();
+	intr_set_level(old_level);
 }
 
 /* Suspends execution for approximately MS milliseconds. */

@@ -184,6 +184,9 @@ thread_print_stats (void) {
 tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
+	enum intr_level old_level;
+    old_level = intr_disable ();
+	
 	struct thread *t;
 	tid_t tid;
 
@@ -211,7 +214,11 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
-
+	if(thread_get_priority() < priority)
+		thread_yield();
+	
+	intr_set_level (old_level);
+	
 	return tid;
 }
 
@@ -313,10 +320,39 @@ thread_yield (void) {
 	intr_set_level (old_level);
 }
 
+void
+__thread_set_priority (int new_priority) {
+	//enum intr_level old_level;
+    //old_level = intr_disable ();
+
+    thread_current()->priority = new_priority;
+	if(list_entry(list_max (&ready_list, less_prio, NULL), struct thread, elem)->priority > new_priority)
+		thread_yield();
+
+    //intr_set_level (old_level);	
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	//enum intr_level old_level;
+	//old_level = intr_disable ();
+
+	int old_priority = thread_get_priority();
+	struct thread *curr = thread_current();
+	curr->priority_orgn = new_priority;
+	if(old_priority <= new_priority){
+		__thread_set_priority(new_priority);
+	}else{
+		if(!list_empty(&thread_current()->holding_locks)){
+			int hprio_lock = list_entry (list_max (&thread_current()->holding_locks, less_prio, NULL), struct lock, elem)->highest_priority;
+			if(hprio_lock < new_priority)
+				__thread_set_priority(new_priority);
+		}else
+			__thread_set_priority(new_priority);
+	}
+
+	//intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -413,7 +449,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	strlcpy (t->name, name, sizeof t->name);
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
+	t->priority_orgn = priority;
 	t->magic = THREAD_MAGIC;
+	list_init(&t->holding_locks);
+	t->waited_lock = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -427,12 +466,7 @@ next_thread_to_run (void) {
 		return idle_thread;
 	else{
 		
-		struct thread *highest_prio_thread = list_entry (list_begin(&ready_list), struct thread, elem); 
-		for(struct list_elem *e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e)){
-			struct thread *t = list_entry(e, struct thread, elem);
-			if(t->priority > highest_prio_thread->priority)
-				highest_prio_thread = t;
-		}
+		struct thread *highest_prio_thread = list_entry(list_max (&ready_list, less_prio, NULL), struct thread, elem);
 		list_remove(&highest_prio_thread->elem);	
 		return highest_prio_thread;
 		//return list_entry (list_pop_front (&ready_list), struct thread, elem); 
@@ -614,3 +648,9 @@ allocate_tid (void) {
 
 	return tid;
 }
+
+bool
+less_prio(const struct list_elem *a, const struct list_elem *b, void *aux){
+	return list_entry(a, struct thread, elem)->priority < list_entry(b, struct thread, elem)->priority;
+}
+

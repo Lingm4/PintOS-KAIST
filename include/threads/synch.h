@@ -20,6 +20,8 @@ void sema_self_test (void);
 struct lock {
 	struct thread *holder;      /* Thread holding lock (for debugging). */
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
+	int highest_priority;
+	struct list_elem elem;
 };
 
 void lock_init (struct lock *);
@@ -37,6 +39,9 @@ void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
+
+bool less_hprio(const struct list_elem *a, const struct list_elem *b, void *aux);
+bool less_prio_sema(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Optimization barrier.
  *

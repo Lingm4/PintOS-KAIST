@@ -211,7 +211,8 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-
+	
+	list_push_back(&thread_current()->childs, &t->c_elem);
 	/* Add to run queue. */
 	thread_unblock (t);
 	if(thread_get_priority() < priority)
@@ -290,11 +291,11 @@ thread_tid (void) {
 /* Deschedules the current thread and destroys it.  Never
    returns to the caller. */
 void
-thread_exit (void) {
+thread_exit (int status) {
 	ASSERT (!intr_context ());
 
 #ifdef USERPROG
-	process_exit ();
+	process_exit (status);
 #endif
 
 	/* Just set our status to dying and schedule another process.
@@ -432,7 +433,7 @@ kernel_thread (thread_func *function, void *aux) {
 
 	intr_enable ();       /* The scheduler runs with interrupts off. */
 	function (aux);       /* Execute the thread function. */
-	thread_exit ();       /* If function() returns, kill the thread. */
+	thread_exit (0);       /* If function() returns, kill the thread. */
 }
 
 
@@ -453,6 +454,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
 	list_init(&t->holding_locks);
 	t->waited_lock = NULL;
+	list_init(&t->childs);
+	t->exit = false;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

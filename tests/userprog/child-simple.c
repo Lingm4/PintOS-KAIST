@@ -5,10 +5,11 @@
 #include <stdio.h>
 #include "tests/lib.h"
 
-const char *test_name = "child-simple";
 int
 main (void) 
 {
+  char tn[] = "child-simple"; 
+  test_name = tn;
   msg ("run");
   return 81;
 }

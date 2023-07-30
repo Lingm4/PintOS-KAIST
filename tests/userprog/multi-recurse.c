@@ -7,13 +7,14 @@
 #include <syscall.h>
 #include "tests/lib.h"
 
-const char *test_name = "multi-recurse";
-
 int
 main (int argc UNUSED, char *argv[]) 
 {
   int n = atoi (argv[1]);
-
+    
+  char tn[] = "multi-recurse";
+  test_name = tn;
+ 
   msg ("begin %d", n);
   if (n != 0) 
     {

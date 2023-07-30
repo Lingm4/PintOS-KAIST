@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <syscall.h>
 
-extern const char *test_name;
+extern char *test_name;
 extern bool quiet;
 
 void msg (const char *, ...) PRINTF_FORMAT (1, 2);

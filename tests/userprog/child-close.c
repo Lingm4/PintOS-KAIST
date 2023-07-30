@@ -12,11 +12,11 @@
 #include "tests/userprog/sample.inc"
 #include "tests/lib.h"
 
-const char *test_name = "child-close";
-
 int
 main (int argc UNUSED, char *argv[]) 
 {
+  char tn[] = "child-close";
+  test_name = tn;
   msg ("begin");
   
   if (!isdigit (*argv[1]))

@@ -7,6 +7,7 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/init.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -39,8 +40,36 @@ syscall_init (void) {
 
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f ) {
 	// TODO: Your implementation goes here.
-	printf ("system call!\n");
-	thread_exit ();
+	if(f->R.rax ==  SYS_HALT){
+		//printf("sys_halt\n");
+		power_off();
+	}
+	else if(f->R.rax ==  SYS_EXIT){ 
+		//printf("sys_exit\n");
+		thread_exit(f->R.rdi);	
+	}
+	else if(f->R.rax == SYS_FORK){ 
+		//printf("sys_fork\n");
+		f->R.rax = process_fork(f->R.rdi, f);
+	}
+	else if (f->R.rax == SYS_EXEC){
+		//printf("sys_exec\n");
+		char cmd[strlen(f->R.rdi) +1];
+		strlcpy(cmd, f->R.rdi, sizeof(cmd));
+		if(process_exec(cmd) == -1)
+			thread_exit(-1);	
+	}
+	else if(f->R.rax == SYS_WAIT){ 
+		//printf("sys_wait\n");
+		f->R.rax = process_wait(f->R.rdi);
+	}
+	else if(f->R.rax == SYS_WRITE){
+		//printf("sys_write\n");
+		if(f->R.rdi == 1)
+			putbuf((char *)f->R.rsi, f->R.rdx);
+	}
+	//printf ("system call!\n");
+	do_iret(f);
 }

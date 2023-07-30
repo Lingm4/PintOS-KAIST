@@ -98,6 +98,13 @@ struct thread {
 	struct list_elem elem;              /* List element. */
 	struct list holding_locks;			/* Holding Locks */
 	struct lock *waited_lock;			/* Thread waited by this thread */
+	
+	struct list childs;					/* List of childs*/
+	struct list_elem c_elem;			/* List element for perent */
+	
+	int exit_status;					/* Status when it exit */
+	bool exit;							/* Is thread exited */
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -133,7 +140,7 @@ struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
-void thread_exit (void) NO_RETURN;
+void thread_exit (int) NO_RETURN;
 void thread_yield (void);
 
 int thread_get_priority (void);

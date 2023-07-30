@@ -10,8 +10,6 @@
 #include <syscall.h>
 #include "tests/lib.h"
 
-const char *test_name = "child-rox";
-
 static void
 try_write (void) 
 {
@@ -31,6 +29,8 @@ try_write (void)
 int
 main (int argc UNUSED, char *argv[]) 
 {
+  char tn[] = "child-rox";
+  test_name = tn;
   msg ("begin");
   try_write ();
 

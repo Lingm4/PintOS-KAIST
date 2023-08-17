@@ -1,8 +1,10 @@
 /* vm.c: Generic interface for virtual memory objects. */
 
+#include <hash.h>
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "threads/pte.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -62,27 +64,34 @@ err:
 
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
-spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
+spt_find_page (struct supplemental_page_table *spt, void *va) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
+	struct page p;
+	struct hash_elem *e;
 
+	p.va = va;
+	page = hash_find(spt->pages, &p.elem);
+	page =  e != NULL ? hash_entry (e, struct page, elem) : NULL;	
 	return page;
 }
 
 /* Insert PAGE into spt with validation. */
 bool
-spt_insert_page (struct supplemental_page_table *spt UNUSED,
-		struct page *page UNUSED) {
+spt_insert_page (struct supplemental_page_table *spt,
+		struct page *page) {
 	int succ = false;
 	/* TODO: Fill this function. */
-
+	struct hash_elem *old = hash_insert(spt->pages, &page->elem);
+	if(old == NULL)
+		succ = true;
 	return succ;
 }
 
 void
 spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	vm_dealloc_page (page);
-	return true;
+	return hash_delete(spt->pages, &page->elem) != NULL? true : false;
 }
 
 /* Get the struct frame, that will be evicted. */
@@ -112,6 +121,13 @@ static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
+	
+	frame = (struct frame *)malloc(sizeof(struct frame));
+	frame->kva = palloc_get_page(PAL_USER);
+	frame->page = NULL;
+	
+	if(frame->kva == NULL)
+		PANIC("To do");
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -150,10 +166,11 @@ vm_dealloc_page (struct page *page) {
 
 /* Claim the page that allocate on VA. */
 bool
-vm_claim_page (void *va UNUSED) {
+vm_claim_page (void *va) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
-
+	page = (struct page *)malloc(sizeof(struct page));
+	page->va = va;
 	return vm_do_claim_page (page);
 }
 
@@ -167,24 +184,67 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-
+	uint64_t *pte = pml4e_walk(thread_current()->pml4, page->va, 1);
+	*pte = vtop (frame->kva) | PTE_U | PTE_P;
 	return swap_in (page, frame->kva);
+}
+
+/* Returns a hash value for page p. */
+unsigned
+page_hash (const struct hash_elem *p_, void *aux UNUSED) {
+  const struct page *p = hash_entry (p_, struct page, elem);
+  return hash_bytes (&p->va, sizeof p->va);
+}
+
+/* Returns true if page a precedes page b. */
+bool
+page_less (const struct hash_elem *a_,
+           const struct hash_elem *b_, void *aux UNUSED) {
+  const struct page *a = hash_entry (a_, struct page, elem);
+  const struct page *b = hash_entry (b_, struct page, elem);
+
+  return a->va < b->va;
+}
+
+/* Destroy page */
+void
+page_destroy(struct hash_elem *e, void *aux){
+	struct page *page = hash_entry(e, struct page, elem);
+	free(page);
 }
 
 /* Initialize new supplemental page table */
 void
-supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_init (struct supplemental_page_table *spt) {
+	spt->pages = (struct hash *)malloc(sizeof(struct hash));
+	hash_init(spt->pages, page_hash, page_less, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
 bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+supplemental_page_table_copy (struct supplemental_page_table *dst,
+		struct supplemental_page_table *src) {
+	
+	hash_clear(dst, page_destroy);
+
+	struct hash_iterator i;
+	hash_first (&i, src->pages);
+	while (hash_next (&i)) {
+    	struct page *f = hash_entry (hash_cur (&i), struct page, elem);
+    	
+		//copy struct page
+		struct page *new = (struct page *)malloc(sizeof(struct page));
+		*new = *f;
+		hash_insert(dst->pages, &new->elem);	
+	}	
 }
 
 /* Free the resource hold by the supplemental page table */
 void
-supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_kill (struct supplemental_page_table *spt) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+
+	hash_destroy(spt->pages, page_destroy);
+	free(spt);
 }
